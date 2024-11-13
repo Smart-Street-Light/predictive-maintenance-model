@@ -1,0 +1,51 @@
+   macro avg       0.56      0.53      0.51    200000
+weighted avg       0.63      0.70      0.64    200000
+
+
+Training PyTorch model for: connectivity_issue
+y_train_current shape: torch.Size([800000, 1])
+Unique classes in y_train_current: tensor([0., 1.], device='cuda:0')
+Epoch [1/25], Loss: 0.9848
+Epoch [2/25], Loss: 0.9833
+Epoch [3/25], Loss: 0.9831
+Epoch [4/25], Loss: 0.9828
+Epoch [5/25], Loss: 0.9828
+Epoch [6/25], Loss: 0.9826
+Epoch [7/25], Loss: 0.9826
+Epoch [8/25], Loss: 0.9825
+Epoch [9/25], Loss: 0.9824
+Epoch [10/25], Loss: 0.9823
+Epoch [11/25], Loss: 0.9822
+Epoch [12/25], Loss: 0.9822
+Epoch [13/25], Loss: 0.9821
+Epoch [14/25], Loss: 0.9820
+Epoch [15/25], Loss: 0.9820
+Epoch [16/25], Loss: 0.9820
+Epoch [17/25], Loss: 0.9819
+Epoch [18/25], Loss: 0.9817
+Epoch [19/25], Loss: 0.9817
+Epoch [20/25], Loss: 0.9817
+Epoch [21/25], Loss: 0.9816
+Epoch [22/25], Loss: 0.9817
+Epoch [23/25], Loss: 0.9815
+Epoch [24/25], Loss: 0.9816
+Epoch [25/25], Loss: 0.9815
+Finished training for connectivity_issue
+Model for 'connectivity_issue' saved to trained_models/connectivity_issue_model.pth
+
+Classification Report for connectivity_issue:
+              precision    recall  f1-score   support
+
+           0       0.82      0.71      0.76    150284
+           1       0.37      0.52      0.43     49716
+
+    accuracy                           0.66    200000
+   macro avg       0.60      0.62      0.60    200000
+weighted avg       0.71      0.66      0.68    200000
+
+
+Scaler saved to trained_models/scaler.joblib
+
+All models have been trained and saved.
+(base) sbag@bhaskara:~/Sajal/model_train$ tmux capture-pane -t training_model -p > training_model_log.txt
+
