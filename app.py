@@ -1,18 +1,20 @@
 # app.py
 
-import os
-import torch
-import torch.nn as nn
-import joblib
-from flask import Flask, request, jsonify
-import requests  # Used only for fetching data from ThingSpeak
-import json  # Import json for parsing JSON strings
-from groq import Groq  # Import the Groq library
-import logging  # For logging
 import datetime
-from alert import alert
-from flask_cors import CORS
+import json  # Import json for parsing JSON strings
+import logging  # For logging
+# import os
 import re
+
+# import joblib
+import requests  # Used only for fetching data from ThingSpeak
+# import torch
+# import torch.nn as nn
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from groq import Groq  # Import the Groq library
+
+from alert import alert
 
 # Allow all CORS policy
 # Configure logging
@@ -20,91 +22,91 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Define the same MaintenanceNN architecture as in training
-class MaintenanceNN(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=64):
-        super(MaintenanceNN, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-        self.relu = nn.ReLU()
+# class MaintenanceNN(nn.Module):
+#     def __init__(self, input_size, output_size, hidden_size=64):
+#         super(MaintenanceNN, self).__init__()
+#         self.fc1 = nn.Linear(input_size, hidden_size)
+#         self.fc2 = nn.Linear(hidden_size, hidden_size)
+#         self.fc3 = nn.Linear(hidden_size, output_size)
+#         self.relu = nn.ReLU()
 
-    def forward(self, x):
-        x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
-        x = self.fc3(x)  # No sigmoid here; applied during prediction
-        return x
+#     def forward(self, x):
+#         x = self.relu(self.fc1(x))
+#         x = self.relu(self.fc2(x))
+#         x = self.fc3(x)  # No sigmoid here; applied during prediction
+#         return x
 
-# Initialize Flask app
+# # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Directory where models and scaler are saved
-MODEL_DIR = 'trained_models_1L_6'
+# # Directory where models and scaler are saved
+# MODEL_DIR = 'trained_models_1L_6'
 
-# Load the scaler
-scaler_path = os.path.join(MODEL_DIR, 'scaler.joblib')
-if not os.path.exists(scaler_path):
-    raise FileNotFoundError(f"Scaler not found at {scaler_path}")
-scaler = joblib.load(scaler_path)
-logger.info("Scaler loaded.")
-logger.info(f"Scaler's expected features: {scaler.feature_names_in_}")
+# # Load the scaler
+# scaler_path = os.path.join(MODEL_DIR, 'scaler.joblib')
+# if not os.path.exists(scaler_path):
+#     raise FileNotFoundError(f"Scaler not found at {scaler_path}")
+# scaler = joblib.load(scaler_path)
+# logger.info("Scaler loaded.")
+# logger.info(f"Scaler's expected features: {scaler.feature_names_in_}")
 
-# Define the expected feature list after preprocessing (no one-hot encoding)
-EXPECTED_FEATURES = [
-    'latitude',
-    'longitude',
-    'temperature',
-    'humidity',
-    'rainfall',
-    'wind_speed',
-    'ambient_light',
-    'operational_hours',
-    'usage_cycles',
-    'energy_consumption',
-    'voltage_level',
-    'fault_logs',
-    'led_lifespan',
-    'sensor_status',
-    'firmware_version',
-    'previous_maintenance',
-    'last_maintenance_days',
-    'vandalism_incidents',
-    'proximity_infrastructure'
-]
+# # Define the expected feature list after preprocessing (no one-hot encoding)
+# EXPECTED_FEATURES = [
+#     'latitude',
+#     'longitude',
+#     'temperature',
+#     'humidity',
+#     'rainfall',
+#     'wind_speed',
+#     'ambient_light',
+#     'operational_hours',
+#     'usage_cycles',
+#     'energy_consumption',
+#     'voltage_level',
+#     'fault_logs',
+#     'led_lifespan',
+#     'sensor_status',
+#     'firmware_version',
+#     'previous_maintenance',
+#     'last_maintenance_days',
+#     'vandalism_incidents',
+#     'proximity_infrastructure'
+# ]
 
-logger.info(f"Expected features: {EXPECTED_FEATURES}")
+# logger.info(f"Expected features: {EXPECTED_FEATURES}")
 
-# Load all models
-models = {}
-maintenance_types = []
-for filename in os.listdir(MODEL_DIR):
-    if filename.endswith('_model.pth'):
-        maintenance_type = filename.replace('_model.pth', '')
-        maintenance_types.append(maintenance_type)
-        model_path = os.path.join(MODEL_DIR, filename)
+# # Load all models
+# models = {}
+# maintenance_types = []
+# for filename in os.listdir(MODEL_DIR):
+#     if filename.endswith('_model.pth'):
+#         maintenance_type = filename.replace('_model.pth', '')
+#         maintenance_types.append(maintenance_type)
+#         model_path = os.path.join(MODEL_DIR, filename)
 
-        input_size = len(EXPECTED_FEATURES)
-        output_size = 1  # Binary classification
+#         input_size = len(EXPECTED_FEATURES)
+#         output_size = 1  # Binary classification
 
-        model = MaintenanceNN(input_size=input_size, output_size=output_size)
-        try:
-            model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-            model.eval()  # Set to evaluation mode
-            models[maintenance_type] = model
-            logger.info(f"Loaded model for '{maintenance_type}' from {model_path}")
-        except Exception as e:
-            logger.error(f"Failed to load model for '{maintenance_type}': {e}")
+#         model = MaintenanceNN(input_size=input_size, output_size=output_size)
+#         try:
+#             model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+#             model.eval()  # Set to evaluation mode
+#             models[maintenance_type] = model
+#             logger.info(f"Loaded model for '{maintenance_type}' from {model_path}")
+#         except Exception as e:
+#             logger.error(f"Failed to load model for '{maintenance_type}': {e}")
 
 # Define the mapping dictionaries based on training (if needed)
-SENSOR_STATUS_MAPPING = {
-    'active': 0,
-    'error': 1
-}
+# SENSOR_STATUS_MAPPING = {
+#     'active': 0,
+#     'error': 1
+# }
 
-PREVIOUS_MAINTENANCE_MAPPING = {
-    'scheduled': 0,
-    'unscheduled': 1
-}
+# PREVIOUS_MAINTENANCE_MAPPING = {
+#     'scheduled': 0,
+#     'unscheduled': 1
+# }
 
 # Define Groq API details using environment variables for security
 GROQ_API_KEY = "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"  # Fetch from environment variable
