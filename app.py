@@ -10,7 +10,11 @@ import json  # Import json for parsing JSON strings
 from groq import Groq  # Import the Groq library
 import logging  # For logging
 import datetime
+from alert import alert
+from flask_cors import CORS
+import re
 
+# Allow all CORS policy
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +36,7 @@ class MaintenanceNN(nn.Module):
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Directory where models and scaler are saved
 MODEL_DIR = 'trained_models_1L_6'
@@ -162,7 +167,7 @@ def predict():
         {thingSpeak_data}
         "current_date_time": "{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         
-        Strictly follow this below JSON output format and refrain from providing any other text:
+        Strictly follow this below JSON output format and refrain from providing any other text, only provide the response of JSON nothing else, else error would come while parsing the response:
         
         {{
           "predictions" : [{{"maintenance_class_name" : "name_of_predicted_maintenance", "reason": "reason"}}, {{"maintenance_class_name_2" : "name_of_predicted_maintenance_2", "reason": "reason"}}]
@@ -178,7 +183,7 @@ def predict():
             # Assuming the Groq library has a chat.completions.create() method similar to OpenAI's
             groq_response = groq_client.chat.completions.create(
                 messages=[prompt],
-                model="llama-3.1-70b-versatile"  # Specify the correct model if needed
+                model="llama-3.3-70b-versatile"  # Specify the correct model if needed
             )
             logger.info(f"Groq response: {groq_response}")
         except Exception as e:
@@ -191,12 +196,24 @@ def predict():
             prediction_text = groq_response.choices[0].message.content
             logger.info(f"Raw prediction text from Groq: {prediction_text}")
 
+            cleaned_text = re.sub(r"^```(?:json)?\n", "", prediction_text)
+            cleaned_text = re.sub(r"\n```$", "", cleaned_text)
+            
             # Parse the JSON string directly
-            predictions_data = json.loads(prediction_text)
+            predictions_data = json.loads(cleaned_text)
             predictions_array = predictions_data.get('predictions', [])
             logger.info(f"Extracted predictions array: {predictions_array}")
+            
+            if predictions_array and (not "No Maintenance" in predictions_array[0].get("maintenance_class_name", "")):    
+                id = thingSpeak_data["channel"]["id"]
+                latitude = thingSpeak_data["channel"]["latitude"]
+                longitude = thingSpeak_data["channel"]["longitude"]
+                location = f"latitude = {latitude}, location = {longitude}"
+                class_name = predictions_array[0].get("maintenance_class_name", "")
+                print(class_name)
+                alert("",f"Street Light - {id} - {class_name}",location, json.dumps(thingSpeak_data))
 
-            # Return the 'predictions' array as the API response
+            # Return the 'predictions' array as the API response        
             return jsonify({'predictions': predictions_array}), 200
 
         except (AttributeError, IndexError, json.JSONDecodeError) as e:
@@ -210,4 +227,4 @@ def predict():
 # Run the Flask app
 if __name__ == '__main__':
     # For production, consider using a production-ready server like Gunicorn
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5025, debug=True)
